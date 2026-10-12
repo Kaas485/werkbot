@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WerkBot</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Team Ops</p>
+          <h1>WerkBot</h1>
+        </div>
+        <span class="status-pill">Live</span>
+      </header>
+
+      <main class="board">
+        <section class="card form-card">
+          <h2>Add task</h2>
+          <form id="task-form">
+            <label>
+              Task
+              <input id="title" name="title" type="text" placeholder="e.g. Prepare sprint notes" required />
+            </label>
+
+            <label>
+              Assignee
+              <input id="assignee" name="assignee" type="text" placeholder="e.g. Alex" />
+            </label>
+
+            <label>
+              Priority
+              <select id="priority" name="priority">
+                <option value="High">High</option>
+                <option value="Medium" selected>Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </label>
+
+            <button type="submit">Create task</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <h2>Tasks</h2>
+            <span id="task-count" class="task-count">0 items</span>
+          </div>
+          <ul id="task-list" class="task-list"></ul>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const taskForm = document.getElementById("task-form");
+      const taskList = document.getElementById("task-list");
+      const taskCount = document.getElementById("task-count");
+
+      async function loadTasks() {
+        const response = await fetch("/api/tasks");
+        const tasks = await response.json();
+
+        taskList.innerHTML = "";
+
+        if (!tasks.length) {
+          taskList.innerHTML = "<li class='empty'>No tasks yet. Add one above.</li>";
+        } else {
+          tasks.forEach((task) => {
+            const li = document.createElement("li");
+            li.className = `task ${task.done ? "done" : ""}`;
+
+            li.innerHTML = `
+              <div class="task-main">
+                <input type="checkbox" ${task.done ? "checked" : ""} data-action="toggle" data-id="${task.id}" />
+                <div>
+                  <h3>${task.title}</h3>
+                  <p>${task.assignee} • ${task.priority}</p>
+                </div>
+              </div>
+              <button class="delete-btn" data-action="delete" data-id="${task.id}">Delete</button>
+            `;
+
+            taskList.appendChild(li);
+          });
+        }
+
+        taskCount.textContent = `${tasks.length} item${tasks.length === 1 ? "" : "s"}`;
+      }
+
+      taskForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const title = document.getElementById("title").value;
+        const assignee = document.getElementById("assignee").value;
+        const priority = document.getElementById("priority").value;
+
+        await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, assignee, priority })
+        });
+
+        taskForm.reset();
+        document.getElementById("priority").value = "Medium";
+        loadTasks();
+      });
+
+      taskList.addEventListener("click", async (event) => {
+        const { action, id } = event.target.dataset;
+
+        if (!action || !id) return;
+
+        if (action === "delete") {
+          await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+          loadTasks();
+        }
+      });
+
+      taskList.addEventListener("change", async (event) => {
+        const { action, id } = event.target.dataset;
+
+        if (action === "toggle") {
+          await fetch(`/api/tasks/${id}`, { method: "PATCH" });
+          loadTasks();
+        }
+      });
+
+      loadTasks();
+    </script>
+  </body>
+</html>
